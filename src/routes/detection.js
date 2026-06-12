@@ -1,6 +1,7 @@
 const express = require("express");
 const { db } = require("../db/database");
 const { runEngine } = require("../engine/ruleEngine");
+const { getActiveVersionId } = require("./versions");
 
 const router = express.Router();
 
@@ -49,9 +50,11 @@ router.post("/detect", (req, res) => {
 
   const result = runEngine(metrics, rules);
 
+  const activeVersionId = getActiveVersionId(targetRuleSetId);
+
   const insertStmt = db.prepare(`
-    INSERT INTO detection_records (app_id, app_name, category_code, rule_set_id, total_score, level, metrics, hit_rules)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO detection_records (app_id, app_name, category_code, rule_set_id, rule_set_version_id, total_score, level, metrics, hit_rules)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
   const insertResult = insertStmt.run(
@@ -59,6 +62,7 @@ router.post("/detect", (req, res) => {
     app_name || "",
     category_code,
     targetRuleSetId,
+    activeVersionId,
     result.totalScore,
     result.level,
     JSON.stringify(metrics),
@@ -77,6 +81,7 @@ router.post("/detect", (req, res) => {
         code: ruleSet.code,
         name: ruleSet.name,
       },
+      rule_set_version_id: activeVersionId,
       total_score: result.totalScore,
       level: result.level,
       hit_rules: result.hitRules,

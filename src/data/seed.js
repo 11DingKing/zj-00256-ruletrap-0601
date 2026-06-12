@@ -104,6 +104,62 @@ const SAMPLE_DETECTIONS = [
     },
   },
   {
+    app_id: "com.example.social2",
+    app_name: "微聊",
+    category_code: "social",
+    metrics: {
+      close_button_area_ratio: 0.015,
+      clickable_hot_area_ratio: 0.55,
+      auto_jump_countdown_seconds: 4,
+      has_shake_jump: 0,
+      close_button_delay_ms: 1000,
+      is_fullscreen_clickable: 0,
+      fake_close_button_count: 0,
+    },
+  },
+  {
+    app_id: "com.example.social3",
+    app_name: "陌友",
+    category_code: "social",
+    metrics: {
+      close_button_area_ratio: 0.005,
+      clickable_hot_area_ratio: 0.9,
+      auto_jump_countdown_seconds: 2,
+      has_shake_jump: 1,
+      close_button_delay_ms: 4000,
+      is_fullscreen_clickable: 1,
+      fake_close_button_count: 3,
+    },
+  },
+  {
+    app_id: "com.example.social4",
+    app_name: "探探",
+    category_code: "social",
+    metrics: {
+      close_button_area_ratio: 0.025,
+      clickable_hot_area_ratio: 0.4,
+      auto_jump_countdown_seconds: 6,
+      has_shake_jump: 0,
+      close_button_delay_ms: 800,
+      is_fullscreen_clickable: 0,
+      fake_close_button_count: 0,
+    },
+  },
+  {
+    app_id: "com.example.social5",
+    app_name: "映客直播",
+    category_code: "social",
+    metrics: {
+      close_button_area_ratio: 0.012,
+      clickable_hot_area_ratio: 0.75,
+      auto_jump_countdown_seconds: 3,
+      has_shake_jump: 1,
+      close_button_delay_ms: 2500,
+      is_fullscreen_clickable: 0,
+      fake_close_button_count: 2,
+    },
+  },
+  {
     app_id: "com.example.shop1",
     app_name: "好物优选",
     category_code: "shopping",
@@ -113,6 +169,34 @@ const SAMPLE_DETECTIONS = [
       auto_jump_countdown_seconds: 5,
       has_shake_jump: 0,
       close_button_delay_ms: 1500,
+      is_fullscreen_clickable: 0,
+      fake_close_button_count: 0,
+    },
+  },
+  {
+    app_id: "com.example.shop2",
+    app_name: "拼夕夕",
+    category_code: "shopping",
+    metrics: {
+      close_button_area_ratio: 0.008,
+      clickable_hot_area_ratio: 0.88,
+      auto_jump_countdown_seconds: 2,
+      has_shake_jump: 1,
+      close_button_delay_ms: 3000,
+      is_fullscreen_clickable: 1,
+      fake_close_button_count: 2,
+    },
+  },
+  {
+    app_id: "com.example.shop3",
+    app_name: "天猫",
+    category_code: "shopping",
+    metrics: {
+      close_button_area_ratio: 0.03,
+      clickable_hot_area_ratio: 0.35,
+      auto_jump_countdown_seconds: 7,
+      has_shake_jump: 0,
+      close_button_delay_ms: 500,
       is_fullscreen_clickable: 0,
       fake_close_button_count: 0,
     },
@@ -132,6 +216,34 @@ const SAMPLE_DETECTIONS = [
     },
   },
   {
+    app_id: "com.example.news2",
+    app_name: "网易闻",
+    category_code: "news",
+    metrics: {
+      close_button_area_ratio: 0.018,
+      clickable_hot_area_ratio: 0.6,
+      auto_jump_countdown_seconds: 4,
+      has_shake_jump: 0,
+      close_button_delay_ms: 2000,
+      is_fullscreen_clickable: 0,
+      fake_close_button_count: 1,
+    },
+  },
+  {
+    app_id: "com.example.news3",
+    app_name: "趣头条",
+    category_code: "news",
+    metrics: {
+      close_button_area_ratio: 0.006,
+      clickable_hot_area_ratio: 0.95,
+      auto_jump_countdown_seconds: 1,
+      has_shake_jump: 1,
+      close_button_delay_ms: 6000,
+      is_fullscreen_clickable: 1,
+      fake_close_button_count: 3,
+    },
+  },
+  {
     app_id: "com.example.game1",
     app_name: "消消乐园",
     category_code: "games",
@@ -141,6 +253,34 @@ const SAMPLE_DETECTIONS = [
       auto_jump_countdown_seconds: 4,
       has_shake_jump: 0,
       close_button_delay_ms: 3500,
+      is_fullscreen_clickable: 0,
+      fake_close_button_count: 0,
+    },
+  },
+  {
+    app_id: "com.example.game2",
+    app_name: "荣耀王者",
+    category_code: "games",
+    metrics: {
+      close_button_area_ratio: 0.01,
+      clickable_hot_area_ratio: 0.8,
+      auto_jump_countdown_seconds: 3,
+      has_shake_jump: 1,
+      close_button_delay_ms: 4000,
+      is_fullscreen_clickable: 0,
+      fake_close_button_count: 1,
+    },
+  },
+  {
+    app_id: "com.example.game3",
+    app_name: "迷你世界",
+    category_code: "games",
+    metrics: {
+      close_button_area_ratio: 0.02,
+      clickable_hot_area_ratio: 0.5,
+      auto_jump_countdown_seconds: 5,
+      has_shake_jump: 0,
+      close_button_delay_ms: 1500,
       is_fullscreen_clickable: 0,
       fake_close_button_count: 0,
     },
@@ -157,6 +297,20 @@ const SAMPLE_DETECTIONS = [
       close_button_delay_ms: 500,
       is_fullscreen_clickable: 0,
       fake_close_button_count: 0,
+    },
+  },
+  {
+    app_id: "com.example.tools2",
+    app_name: "极速清理",
+    category_code: "tools",
+    metrics: {
+      close_button_area_ratio: 0.012,
+      clickable_hot_area_ratio: 0.75,
+      auto_jump_countdown_seconds: 3,
+      has_shake_jump: 1,
+      close_button_delay_ms: 3000,
+      is_fullscreen_clickable: 0,
+      fake_close_button_count: 2,
     },
   },
 ];
@@ -185,38 +339,87 @@ function seedDefaultData() {
     );
   }
 
-  const ruleSetRow = db
-    .prepare("SELECT id FROM rule_sets WHERE is_default = 1 LIMIT 1")
-    .get();
-  if (ruleSetRow) {
-    const allRuleSets = db
-      .prepare("SELECT id, category_code FROM rule_sets WHERE is_default = 1")
-      .all();
+  const allRuleSets = db
+    .prepare("SELECT id, category_code FROM rule_sets WHERE is_default = 1")
+    .all();
 
-    for (const rs of allRuleSets) {
-      const ruleCount = db
-        .prepare("SELECT COUNT(*) as cnt FROM rules WHERE rule_set_id = ?")
-        .get(rs.id);
-      if (ruleCount.cnt === 0) {
-        const insertRule = db.prepare(`
-          INSERT INTO rules (rule_set_id, code, name, description, dimension, operator, threshold, unit, weight, is_enabled, severity)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
-        `);
+  for (const rs of allRuleSets) {
+    const ruleCount = db
+      .prepare("SELECT COUNT(*) as cnt FROM rules WHERE rule_set_id = ?")
+      .get(rs.id);
+    if (ruleCount.cnt === 0) {
+      const insertRule = db.prepare(`
+        INSERT INTO rules (rule_set_id, code, name, description, dimension, operator, threshold, unit, weight, is_enabled, severity)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
+      `);
 
-        for (const rule of DEFAULT_RULES) {
-          insertRule.run(
-            rs.id,
-            rule.code,
-            rule.name,
-            rule.description,
-            rule.dimension,
-            rule.operator,
-            rule.threshold,
-            rule.unit,
-            rule.weight,
-            rule.severity,
-          );
-        }
+      for (const rule of DEFAULT_RULES) {
+        insertRule.run(
+          rs.id,
+          rule.code,
+          rule.name,
+          rule.description,
+          rule.dimension,
+          rule.operator,
+          rule.threshold,
+          rule.unit,
+          rule.weight,
+          rule.severity,
+        );
+      }
+    }
+  }
+
+  for (const rs of allRuleSets) {
+    const versionCount = db
+      .prepare(
+        "SELECT COUNT(*) as cnt FROM rule_set_versions WHERE rule_set_id = ?",
+      )
+      .get(rs.id);
+    if (versionCount.cnt === 0) {
+      const now = Math.floor(Date.now() / 1000);
+      const insertVersion = db.prepare(`
+        INSERT INTO rule_set_versions (
+          rule_set_id, version_number, name, description,
+          status, activated_at, created_by, change_log, created_at
+        ) VALUES (?, 1, ?, ?, 'active', ?, 'system', '初始化默认规则集', ?)
+      `);
+
+      const versionResult = insertVersion.run(
+        rs.id,
+        "v1.0 初始版本",
+        "系统初始化时创建的默认规则版本",
+        now,
+        now,
+      );
+
+      const versionId = versionResult.lastInsertRowid;
+
+      const rules = db
+        .prepare("SELECT * FROM rules WHERE rule_set_id = ?")
+        .all(rs.id);
+
+      const insertRuleVersion = db.prepare(`
+        INSERT INTO rule_versions (
+          rule_set_version_id, rule_code, name, description, dimension,
+          operator, threshold, unit, weight, is_enabled, severity
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+
+      for (const rule of rules) {
+        insertRuleVersion.run(
+          versionId,
+          rule.code,
+          rule.name,
+          rule.description || "",
+          rule.dimension,
+          rule.operator,
+          rule.threshold,
+          rule.unit || "",
+          rule.weight,
+          rule.is_enabled,
+          rule.severity,
+        );
       }
     }
   }

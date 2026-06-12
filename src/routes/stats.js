@@ -172,6 +172,14 @@ router.get("/overview", (req, res) => {
   const totalCategories = db
     .prepare("SELECT COUNT(*) as cnt FROM app_categories")
     .get().cnt;
+  const totalVersions = db
+    .prepare("SELECT COUNT(*) as cnt FROM rule_set_versions")
+    .get().cnt;
+  const activeVersions = db
+    .prepare(
+      "SELECT COUNT(*) as cnt FROM rule_set_versions WHERE status = 'active'",
+    )
+    .get().cnt;
 
   const levelSql =
     "SELECT level, COUNT(*) as count FROM detection_records GROUP BY level";
@@ -194,8 +202,357 @@ router.get("/overview", (req, res) => {
       enabled_rules: enabledRules,
       total_rule_sets: totalRuleSets,
       total_categories: totalCategories,
+      total_versions: totalVersions,
+      active_versions: activeVersions,
       level_distribution: levelMap,
       violation_rate: violationRate,
+    },
+  });
+});
+
+router.get("/version-detection-trend", (req, res) => {
+  const { version_id, days } = req.query;
+
+  if (!version_id) {
+    return res.json({ code: 400, message: "请指定版本ID" });
+  }
+
+  const version = db
+    .prepare("SELECT * FROM rule_set_versions WHERE id = ?")
+    .get(version_id);
+  if (!version) {
+    return res.json({ code: 404, message: "版本不存在" });
+  }
+
+  const daysBack = parseInt(days) || 7;
+  const now = Math.floor(Date.now() / 1000);
+  const startTime = version.activated_at
+    ? version.activated_at - daysBack * 24 * 60 * 60
+    : now - daysBack * 24 * 60 * 60;
+  const endTime = now + 24 * 60 * 60;
+
+  const sql = `
+    SELECT
+      date(datetime(created_at, 'unixepoch')) as date,
+      COUNT(*) as total,
+      SUM(CASE WHEN level = 'compliant' THEN 1 ELSE 0 END) as compliant,
+      SUM(CASE WHEN level = 'suspicious' THEN 1 ELSE 0 END) as suspicious,
+      SUM(CASE WHEN level = 'violation' THEN 1 ELSE 0 END) as violation,
+      AVG(total_score) as avg_score
+    FROM detection_records
+    WHERE rule_set_id = ? AND created_at >= ? AND created_at <= ?
+    GROUP BY date(datetime(created_at, 'unixepoch'))
+    ORDER BY date
+  `;
+
+  const rows = db.prepare(sql).all(version.rule_set_id, startTime, endTime);
+
+  const dailyStats = rows.map((row) => ({
+    date: row.date,
+    total: row.total,
+    compliant: row.compliant,
+    suspicious: row.suspicious,
+    violation: row.violation,
+    avg_score: Number(row.avg_score.toFixed(2)),
+    violation_rate:
+      row.total > 0
+        ? Number(((row.violation / row.total) * 100).toFixed(2))
+        : 0,
+  }));
+
+  res.json({
+    code: 0,
+    data: {
+      version: {
+        id: version.id,
+        version_number: version.version_number,
+        name: version.name,
+        status: version.status,
+        activated_at: version.activated_at,
+      },
+      activated_date: version.activated_at
+        ? new Date(version.activated_at * 1000).toISOString().split("T")[0]
+        : null,
+      daily_stats: dailyStats,
+      days_analyzed: daysBack,
+    },
+  });
+});
+
+router.get("/version-impact", (req, res) => {
+  const { version_id } = req.query;
+
+  if (!version_id) {
+    return res.json({ code: 400, message: "请指定版本ID" });
+  }
+
+  const version = db
+    .prepare("SELECT * FROM rule_set_versions WHERE id = ?")
+    .get(version_id);
+  if (!version) {
+    return res.json({ code: 404, message: "版本不存在" });
+  }
+
+  if (!version.activated_at) {
+    return res.json({ code: 400, message: "该版本尚未启用，无法统计上线影响" });
+  }
+
+  const beforeSql = `
+    SELECT
+      COUNT(*) as total,
+      SUM(CASE WHEN level = 'compliant' THEN 1 ELSE 0 END) as compliant,
+      SUM(CASE WHEN level = 'suspicious' THEN 1 ELSE 0 END) as suspicious,
+      SUM(CASE WHEN level = 'violation' THEN 1 ELSE 0 END) as violation,
+      AVG(total_score) as avg_score
+    FROM detection_records
+    WHERE rule_set_id = ? AND created_at < ?
+  `;
+
+  const afterSql = `
+    SELECT
+      COUNT(*) as total,
+      SUM(CASE WHEN level = 'compliant' THEN 1 ELSE 0 END) as compliant,
+      SUM(CASE WHEN level = 'suspicious' THEN 1 ELSE 0 END) as suspicious,
+      SUM(CASE WHEN level = 'violation' THEN 1 ELSE 0 END) as violation,
+      AVG(total_score) as avg_score
+    FROM detection_records
+    WHERE rule_set_id = ? AND created_at >= ?
+  `;
+
+  const before = db
+    .prepare(beforeSql)
+    .get(version.rule_set_id, version.activated_at);
+  const after = db
+    .prepare(afterSql)
+    .get(version.rule_set_id, version.activated_at);
+
+  const calcRate = (count, total) =>
+    total > 0 ? Number(((count / total) * 100).toFixed(2)) : 0;
+
+  const beforeData = {
+    total: before.total || 0,
+    compliant: before.compliant || 0,
+    suspicious: before.suspicious || 0,
+    violation: before.violation || 0,
+    avg_score: before.avg_score ? Number(before.avg_score.toFixed(2)) : 0,
+    compliant_rate: calcRate(before.compliant || 0, before.total || 0),
+    violation_rate: calcRate(before.violation || 0, before.total || 0),
+  };
+
+  const afterData = {
+    total: after.total || 0,
+    compliant: after.compliant || 0,
+    suspicious: after.suspicious || 0,
+    violation: after.violation || 0,
+    avg_score: after.avg_score ? Number(after.avg_score.toFixed(2)) : 0,
+    compliant_rate: calcRate(after.compliant || 0, after.total || 0),
+    violation_rate: calcRate(after.violation || 0, after.total || 0),
+  };
+
+  const diff = {
+    total: afterData.total - beforeData.total,
+    compliant: afterData.compliant - beforeData.compliant,
+    suspicious: afterData.suspicious - beforeData.suspicious,
+    violation: afterData.violation - beforeData.violation,
+    avg_score: Number((afterData.avg_score - beforeData.avg_score).toFixed(2)),
+    compliant_rate: Number(
+      (afterData.compliant_rate - beforeData.compliant_rate).toFixed(2),
+    ),
+    violation_rate: Number(
+      (afterData.violation_rate - beforeData.violation_rate).toFixed(2),
+    ),
+  };
+
+  const beforeRuleSql = `
+    SELECT id, hit_rules FROM detection_records
+    WHERE rule_set_id = ? AND created_at < ?
+  `;
+  const afterRuleSql = `
+    SELECT id, hit_rules FROM detection_records
+    WHERE rule_set_id = ? AND created_at >= ?
+  `;
+
+  const beforeRecords = db
+    .prepare(beforeRuleSql)
+    .all(version.rule_set_id, version.activated_at);
+  const afterRecords = db
+    .prepare(afterRuleSql)
+    .all(version.rule_set_id, version.activated_at);
+
+  const countRuleHits = (records) => {
+    const hitMap = {};
+    for (const record of records) {
+      const rules = JSON.parse(record.hit_rules);
+      for (const rule of rules) {
+        if (!hitMap[rule.code]) {
+          hitMap[rule.code] = {
+            code: rule.code,
+            name: rule.name,
+            dimension: rule.dimension,
+            severity: rule.severity,
+            hit_count: 0,
+          };
+        }
+        hitMap[rule.code].hit_count++;
+      }
+    }
+    return hitMap;
+  };
+
+  const beforeHits = countRuleHits(beforeRecords);
+  const afterHits = countRuleHits(afterRecords);
+
+  const allCodes = new Set([
+    ...Object.keys(beforeHits),
+    ...Object.keys(afterHits),
+  ]);
+  const ruleChanges = [];
+
+  for (const code of allCodes) {
+    const before = beforeHits[code] || {
+      hit_count: 0,
+      name: code,
+      dimension: "",
+      severity: "",
+    };
+    const after = afterHits[code] || {
+      hit_count: 0,
+      name: code,
+      dimension: "",
+      severity: "",
+    };
+    const beforeRate =
+      beforeRecords.length > 0
+        ? (before.hit_count / beforeRecords.length) * 100
+        : 0;
+    const afterRate =
+      afterRecords.length > 0
+        ? (after.hit_count / afterRecords.length) * 100
+        : 0;
+
+    ruleChanges.push({
+      code,
+      name: after.name || before.name,
+      dimension: after.dimension || before.dimension,
+      severity: after.severity || before.severity,
+      before_hit_count: before.hit_count,
+      after_hit_count: after.hit_count,
+      hit_count_change: after.hit_count - before.hit_count,
+      before_hit_rate: Number(beforeRate.toFixed(2)),
+      after_hit_rate: Number(afterRate.toFixed(2)),
+      hit_rate_change: Number((afterRate - beforeRate).toFixed(2)),
+    });
+  }
+
+  ruleChanges.sort(
+    (a, b) => Math.abs(b.hit_count_change) - Math.abs(a.hit_count_change),
+  );
+
+  res.json({
+    code: 0,
+    data: {
+      version: {
+        id: version.id,
+        version_number: version.version_number,
+        name: version.name,
+        status: version.status,
+        activated_at: version.activated_at,
+        activated_date: new Date(version.activated_at * 1000)
+          .toISOString()
+          .split("T")[0],
+      },
+      before: beforeData,
+      after: afterData,
+      diff: diff,
+      rule_changes: ruleChanges,
+      before_sample_size: beforeRecords.length,
+      after_sample_size: afterRecords.length,
+    },
+  });
+});
+
+router.get("/version-comparison", (req, res) => {
+  const { rule_set_id } = req.query;
+
+  if (!rule_set_id) {
+    return res.json({ code: 400, message: "请指定规则集ID" });
+  }
+
+  const versions = db
+    .prepare(
+      `
+    SELECT * FROM rule_set_versions
+    WHERE rule_set_id = ? AND status IN ('active', 'archived')
+    ORDER BY version_number DESC
+  `,
+    )
+    .all(rule_set_id);
+
+  if (versions.length === 0) {
+    return res.json({ code: 404, message: "该规则集没有已启用过的版本" });
+  }
+
+  const versionStats = [];
+
+  for (const version of versions) {
+    if (!version.activated_at) continue;
+
+    const sql = `
+      SELECT
+        COUNT(*) as total,
+        SUM(CASE WHEN level = 'compliant' THEN 1 ELSE 0 END) as compliant,
+        SUM(CASE WHEN level = 'suspicious' THEN 1 ELSE 0 END) as suspicious,
+        SUM(CASE WHEN level = 'violation' THEN 1 ELSE 0 END) as violation,
+        AVG(total_score) as avg_score
+      FROM detection_records
+      WHERE rule_set_id = ? AND created_at >= ?
+      AND (
+        SELECT COALESCE(MIN(activated_at), strftime('%s', 'now'))
+        FROM rule_set_versions
+        WHERE rule_set_id = ? AND status IN ('active', 'archived') AND activated_at > ?
+      ) > created_at
+    `;
+
+    const stats = db
+      .prepare(sql)
+      .get(
+        rule_set_id,
+        version.activated_at,
+        rule_set_id,
+        version.activated_at,
+      );
+
+    if (stats && stats.total > 0) {
+      versionStats.push({
+        version_id: version.id,
+        version_number: version.version_number,
+        version_name: version.name,
+        activated_at: version.activated_at,
+        total: stats.total,
+        compliant: stats.compliant,
+        suspicious: stats.suspicious,
+        violation: stats.violation,
+        avg_score: Number(stats.avg_score.toFixed(2)),
+        violation_rate:
+          stats.total > 0
+            ? Number(((stats.violation / stats.total) * 100).toFixed(2))
+            : 0,
+        compliant_rate:
+          stats.total > 0
+            ? Number(((stats.compliant / stats.total) * 100).toFixed(2))
+            : 0,
+      });
+    }
+  }
+
+  versionStats.sort((a, b) => a.version_number - b.version_number);
+
+  res.json({
+    code: 0,
+    data: {
+      rule_set_id: parseInt(rule_set_id),
+      versions: versionStats,
+      version_count: versionStats.length,
     },
   });
 });

@@ -1,17 +1,17 @@
-const Database = require('better-sqlite3');
-const path = require('path');
-const fs = require('fs');
+const Database = require("better-sqlite3");
+const path = require("path");
+const fs = require("fs");
 
-const dataDir = path.join(__dirname, '..', '..', 'data');
+const dataDir = path.join(__dirname, "..", "..", "data");
 if (!fs.existsSync(dataDir)) {
   fs.mkdirSync(dataDir, { recursive: true });
 }
 
-const dbPath = path.join(dataDir, 'ruletrap.db');
+const dbPath = path.join(dataDir, "ruletrap.db");
 const db = new Database(dbPath);
 
-db.pragma('journal_mode = WAL');
-db.pragma('foreign_keys = ON');
+db.pragma("journal_mode = WAL");
+db.pragma("foreign_keys = ON");
 
 function initTables() {
   db.exec(`
@@ -53,24 +53,99 @@ function initTables() {
       UNIQUE(rule_set_id, code)
     );
 
+    CREATE TABLE IF NOT EXISTS rule_set_versions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      rule_set_id INTEGER NOT NULL,
+      version_number INTEGER NOT NULL,
+      name TEXT NOT NULL,
+      description TEXT,
+      status TEXT NOT NULL DEFAULT 'draft',
+      activated_at INTEGER,
+      created_by TEXT,
+      change_log TEXT,
+      created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
+      FOREIGN KEY (rule_set_id) REFERENCES rule_sets(id) ON DELETE CASCADE,
+      UNIQUE(rule_set_id, version_number)
+    );
+
+    CREATE TABLE IF NOT EXISTS rule_versions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      rule_set_version_id INTEGER NOT NULL,
+      rule_code TEXT NOT NULL,
+      name TEXT NOT NULL,
+      description TEXT,
+      dimension TEXT NOT NULL,
+      operator TEXT NOT NULL,
+      threshold REAL NOT NULL,
+      unit TEXT,
+      weight INTEGER NOT NULL DEFAULT 10,
+      is_enabled INTEGER NOT NULL DEFAULT 1,
+      severity TEXT NOT NULL DEFAULT 'violation',
+      created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
+      FOREIGN KEY (rule_set_version_id) REFERENCES rule_set_versions(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS shadow_evaluations (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      rule_set_id INTEGER NOT NULL,
+      baseline_version_id INTEGER NOT NULL,
+      candidate_version_id INTEGER NOT NULL,
+      name TEXT NOT NULL,
+      description TEXT,
+      status TEXT NOT NULL DEFAULT 'pending',
+      sample_count INTEGER NOT NULL DEFAULT 0,
+      diff_count INTEGER NOT NULL DEFAULT 0,
+      result_summary TEXT,
+      started_at INTEGER,
+      completed_at INTEGER,
+      created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
+      FOREIGN KEY (rule_set_id) REFERENCES rule_sets(id) ON DELETE CASCADE,
+      FOREIGN KEY (baseline_version_id) REFERENCES rule_set_versions(id),
+      FOREIGN KEY (candidate_version_id) REFERENCES rule_set_versions(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS shadow_evaluation_results (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      evaluation_id INTEGER NOT NULL,
+      detection_record_id INTEGER NOT NULL,
+      baseline_total_score REAL NOT NULL,
+      baseline_level TEXT NOT NULL,
+      baseline_hit_rules TEXT NOT NULL,
+      candidate_total_score REAL NOT NULL,
+      candidate_level TEXT NOT NULL,
+      candidate_hit_rules TEXT NOT NULL,
+      has_diff INTEGER NOT NULL DEFAULT 0,
+      diff_details TEXT,
+      created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
+      FOREIGN KEY (evaluation_id) REFERENCES shadow_evaluations(id) ON DELETE CASCADE,
+      FOREIGN KEY (detection_record_id) REFERENCES detection_records(id) ON DELETE CASCADE
+    );
+
     CREATE TABLE IF NOT EXISTS detection_records (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       app_id TEXT NOT NULL,
       app_name TEXT,
       category_code TEXT NOT NULL,
       rule_set_id INTEGER NOT NULL,
+      rule_set_version_id INTEGER,
       total_score REAL NOT NULL DEFAULT 0,
       level TEXT NOT NULL,
       metrics TEXT NOT NULL,
       hit_rules TEXT NOT NULL,
       created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
-      FOREIGN KEY (rule_set_id) REFERENCES rule_sets(id)
+      FOREIGN KEY (rule_set_id) REFERENCES rule_sets(id),
+      FOREIGN KEY (rule_set_version_id) REFERENCES rule_set_versions(id)
     );
 
     CREATE INDEX IF NOT EXISTS idx_detection_app ON detection_records(app_id);
     CREATE INDEX IF NOT EXISTS idx_detection_category ON detection_records(category_code);
     CREATE INDEX IF NOT EXISTS idx_detection_level ON detection_records(level);
+    CREATE INDEX IF NOT EXISTS idx_detection_version ON detection_records(rule_set_version_id);
     CREATE INDEX IF NOT EXISTS idx_rules_set ON rules(rule_set_id);
+    CREATE INDEX IF NOT EXISTS idx_rs_versions ON rule_set_versions(rule_set_id);
+    CREATE INDEX IF NOT EXISTS idx_rule_versions ON rule_versions(rule_set_version_id);
+    CREATE INDEX IF NOT EXISTS idx_shadow_eval ON shadow_evaluations(rule_set_id);
+    CREATE INDEX IF NOT EXISTS idx_shadow_results ON shadow_evaluation_results(evaluation_id);
   `);
 }
 

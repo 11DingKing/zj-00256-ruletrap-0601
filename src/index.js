@@ -19,6 +19,8 @@ function seedSampleDetections() {
     .get().cnt;
   if (count > 0) return;
 
+  const { getActiveVersionId } = require("./routes/versions");
+
   for (const sample of SAMPLE_DETECTIONS) {
     const ruleSet = db
       .prepare(
@@ -32,6 +34,8 @@ function seedSampleDetections() {
 
     if (!ruleSet) continue;
 
+    const activeVersionId = getActiveVersionId(ruleSet.id);
+
     const rules = db
       .prepare("SELECT * FROM rules WHERE rule_set_id = ?")
       .all(ruleSet.id);
@@ -39,14 +43,15 @@ function seedSampleDetections() {
 
     db.prepare(
       `
-      INSERT INTO detection_records (app_id, app_name, category_code, rule_set_id, total_score, level, metrics, hit_rules)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO detection_records (app_id, app_name, category_code, rule_set_id, rule_set_version_id, total_score, level, metrics, hit_rules)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
     ).run(
       sample.app_id,
       sample.app_name,
       sample.category_code,
       ruleSet.id,
+      activeVersionId,
       result.totalScore,
       result.level,
       JSON.stringify(sample.metrics),
@@ -76,6 +81,8 @@ app.use((req, res, next) => {
 app.use("/api/rules", require("./routes/rules"));
 app.use("/api/detection", require("./routes/detection"));
 app.use("/api/stats", require("./routes/stats"));
+app.use("/api/versions", require("./routes/versions").router);
+app.use("/api/shadow", require("./routes/shadow"));
 
 app.get("/api/health", (req, res) => {
   res.json({
@@ -127,6 +134,42 @@ app.listen(PORT, () => {
   console.log(`   GET  /api/stats/level-distribution  - 违规档位分布`);
   console.log(`   GET  /api/stats/rule-hit-frequency  - 规则命中频次`);
   console.log(`   GET  /api/stats/category-summary    - 分类汇总`);
+  console.log(`   GET  /api/stats/version-detection-trend - 版本检出趋势`);
+  console.log(`   GET  /api/stats/version-impact      - 版本上线影响`);
+  console.log(`   GET  /api/stats/version-comparison   - 版本间对比`);
+  console.log(`   ---`);
+  console.log(
+    `   GET  /api/versions/rule-sets/:id/versions         - 版本列表`,
+  );
+  console.log(
+    `   GET  /api/versions/rule-sets/:id/versions/active  - 当前启用版本`,
+  );
+  console.log(
+    `   POST /api/versions/rule-sets/:id/versions         - 创建版本快照`,
+  );
+  console.log(
+    `   POST /api/versions/rule-sets/:id/versions/:vid/activate - 启用版本`,
+  );
+  console.log(
+    `   POST /api/versions/rule-sets/:id/versions/:vid/rollback  - 回滚版本`,
+  );
+  console.log(
+    `   GET  /api/versions/rule-sets/:id/versions/compare - 版本配置对比`,
+  );
+  console.log(
+    `   POST /api/versions/rule-sets/:id/versions/:vid/preview-detect - 试算检测`,
+  );
+  console.log(`   ---`);
+  console.log(`   GET  /api/shadow/evaluations        - 影子评测列表`);
+  console.log(`   POST /api/shadow/evaluations        - 创建影子评测`);
+  console.log(`   POST /api/shadow/evaluations/:id/run - 重新执行评测`);
+  console.log(`   GET  /api/shadow/evaluations/:id    - 评测详情`);
+  console.log(
+    `   GET  /api/shadow/evaluations/:id/results      - 评测结果列表`,
+  );
+  console.log(
+    `   GET  /api/shadow/evaluations/:id/diff-summary - 评测差异汇总`,
+  );
   console.log();
 });
 
