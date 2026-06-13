@@ -1,7 +1,7 @@
 const express = require("express");
 const path = require("path");
 const fs = require("fs");
-const { initTables, db } = require("./db/database");
+const { initTables, db, seedDefaultThresholds } = require("./db/database");
 const { seedDefaultData, SAMPLE_DETECTIONS } = require("./data/seed");
 const { runEngine } = require("./engine/ruleEngine");
 
@@ -11,6 +11,7 @@ if (!fs.existsSync(dataDir)) {
 }
 
 initTables();
+seedDefaultThresholds();
 const { DEFAULT_CATEGORIES } = seedDefaultData();
 
 function seedSampleDetections() {
@@ -120,6 +121,9 @@ app.listen(PORT, () => {
   console.log(`   - 检测记录: ${recordCount} 条`);
   console.log(`\n🔧 API 接口:`);
   console.log(`   GET  /api/health              - 健康检查`);
+  console.log(
+    `   GET  /api/rules/meta          - 规则元数据(维度/操作符/严重级别)`,
+  );
   console.log(`   GET  /api/rules/categories    - 应用类别列表`);
   console.log(`   GET  /api/rules/rule-sets     - 规则集列表`);
   console.log(`   GET  /api/rules/rule-sets/:id - 规则集详情(含规则)`);
@@ -128,6 +132,8 @@ app.listen(PORT, () => {
   console.log(`   PUT  /api/rules/rules/:id     - 修改规则`);
   console.log(`   PATCH /api/rules/rules/:id/toggle - 启停规则`);
   console.log(`   DELETE /api/rules/rules/:id   - 删除规则`);
+  console.log(`   GET  /api/rules/level-thresholds  - 获取档位阈值`);
+  console.log(`   PUT  /api/rules/level-thresholds  - 设置档位阈值`);
   console.log(`   POST /api/detection/detect    - 提交检测`);
   console.log(`   GET  /api/detection/records   - 检测记录列表`);
   console.log(`   GET  /api/stats/overview      - 总览统计`);

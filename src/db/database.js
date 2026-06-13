@@ -1,6 +1,7 @@
 const Database = require("better-sqlite3");
 const path = require("path");
 const fs = require("fs");
+const { DEFAULT_LEVEL_THRESHOLDS } = require("../config/ruleConfig");
 
 const dataDir = path.join(__dirname, "..", "..", "data");
 if (!fs.existsSync(dataDir)) {
@@ -146,7 +147,61 @@ function initTables() {
     CREATE INDEX IF NOT EXISTS idx_rule_versions ON rule_versions(rule_set_version_id);
     CREATE INDEX IF NOT EXISTS idx_shadow_eval ON shadow_evaluations(rule_set_id);
     CREATE INDEX IF NOT EXISTS idx_shadow_results ON shadow_evaluation_results(evaluation_id);
+
+    CREATE TABLE IF NOT EXISTS level_thresholds (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      suspicious REAL NOT NULL,
+      violation REAL NOT NULL,
+      created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
+      updated_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
+    );
   `);
 }
 
-module.exports = { db, initTables };
+function seedDefaultThresholds() {
+  const row = db.prepare("SELECT COUNT(*) as cnt FROM level_thresholds").get();
+  if (row.cnt === 0) {
+    db.prepare(
+      "INSERT INTO level_thresholds (suspicious, violation) VALUES (?, ?)",
+    ).run(
+      DEFAULT_LEVEL_THRESHOLDS.suspicious,
+      DEFAULT_LEVEL_THRESHOLDS.violation,
+    );
+  }
+}
+
+function getLevelThresholds() {
+  const row = db
+    .prepare(
+      "SELECT suspicious, violation FROM level_thresholds ORDER BY id DESC LIMIT 1",
+    )
+    .get();
+  if (row) return { suspicious: row.suspicious, violation: row.violation };
+  return { ...DEFAULT_LEVEL_THRESHOLDS };
+}
+
+function setLevelThresholds({ suspicious, violation }) {
+  const sNum = Number(suspicious);
+  const vNum = Number(violation);
+  if (isNaN(sNum) || isNaN(vNum)) {
+    throw new Error("suspicious 和 violation 必须是有效数字");
+  }
+  if (sNum < 0 || vNum < 0) {
+    throw new Error("阈值不能为负数");
+  }
+  if (vNum <= sNum) {
+    throw new Error("violation 阈值必须大于 suspicious 阈值");
+  }
+  db.prepare(
+    "INSERT INTO level_thresholds (suspicious, violation, updated_at) VALUES (?, ?, strftime('%s', 'now'))",
+  ).run(sNum, vNum);
+  return { suspicious: sNum, violation: vNum };
+}
+
+module.exports = {
+  db,
+  initTables,
+  seedDefaultThresholds,
+  getLevelThresholds,
+  setLevelThresholds,
+};

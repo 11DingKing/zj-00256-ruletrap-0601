@@ -1,7 +1,36 @@
 const express = require("express");
-const { db } = require("../db/database");
+const {
+  db,
+  getLevelThresholds,
+  setLevelThresholds,
+} = require("../db/database");
+const {
+  validateRuleInput,
+  normalizeThreshold,
+  DIMENSION_META,
+  VALID_OPERATORS,
+  VALID_OPERATOR_KEYS,
+  VALID_SEVERITIES,
+} = require("../config/ruleConfig");
 
 const router = express.Router();
+
+router.get("/meta", (req, res) => {
+  res.json({
+    code: 0,
+    data: {
+      dimensions: Object.entries(DIMENSION_META).map(([key, meta]) => ({
+        key,
+        ...meta,
+      })),
+      operators: VALID_OPERATOR_KEYS.map((k) => ({
+        key: k,
+        label: VALID_OPERATORS[k].label,
+      })),
+      severities: VALID_SEVERITIES,
+    },
+  });
+});
 
 router.get("/categories", (req, res) => {
   const categories = db
@@ -78,15 +107,29 @@ router.post("/rules", (req, res) => {
     severity,
   } = req.body;
 
-  if (
-    !rule_set_id ||
-    !code ||
-    !name ||
-    !dimension ||
-    !operator ||
-    threshold === undefined
-  ) {
-    return res.json({ code: 400, message: "缺少必要参数" });
+  if (!rule_set_id || !code || !name) {
+    return res.json({ code: 400, message: "缺少必要参数：rule_set_id, code, name" });
+  }
+
+  const validationErrors = validateRuleInput({
+    dimension,
+    operator,
+    threshold,
+    severity,
+    weight,
+  });
+  if (validationErrors.length > 0) {
+    return res.json({
+      code: 400,
+      message: "规则参数校验失败",
+      errors: validationErrors,
+    });
+  }
+
+  let normalizedThreshold = threshold;
+  const normResult = normalizeThreshold(dimension, threshold);
+  if (normResult.ok) {
+    normalizedThreshold = normResult.value;
   }
 
   try {
@@ -101,8 +144,8 @@ router.post("/rules", (req, res) => {
       description || "",
       dimension,
       operator,
-      threshold,
-      unit || "",
+      normalizedThreshold,
+      unit || (DIMENSION_META[dimension]?.unit || ""),
       weight !== undefined ? weight : 10,
       is_enabled !== undefined ? is_enabled : 1,
       severity || "violation",
@@ -124,6 +167,23 @@ router.put("/rules/:id", (req, res) => {
     return res.json({ code: 404, message: "规则不存在" });
   }
 
+  const merged = {
+    dimension: req.body.dimension !== undefined ? req.body.dimension : rule.dimension,
+    operator: req.body.operator !== undefined ? req.body.operator : rule.operator,
+    threshold: req.body.threshold !== undefined ? req.body.threshold : rule.threshold,
+    severity: req.body.severity !== undefined ? req.body.severity : rule.severity,
+    weight: req.body.weight !== undefined ? req.body.weight : rule.weight,
+  };
+
+  const validationErrors = validateRuleInput(merged);
+  if (validationErrors.length > 0) {
+    return res.json({
+      code: 400,
+      message: "规则参数校验失败",
+      errors: validationErrors,
+    });
+  }
+
   const fields = [
     "name",
     "description",
@@ -140,8 +200,14 @@ router.put("/rules/:id", (req, res) => {
 
   for (const field of fields) {
     if (req.body[field] !== undefined) {
+      let value = req.body[field];
+      if (field === "threshold") {
+        const targetDimension = merged.dimension;
+        const norm = normalizeThreshold(targetDimension, value);
+        if (norm.ok) value = norm.value;
+      }
       updates.push(`${field} = ?`);
-      params.push(req.body[field]);
+      params.push(value);
     }
   }
 
@@ -188,6 +254,27 @@ router.delete("/rules/:id", (req, res) => {
     return res.json({ code: 404, message: "规则不存在" });
   }
   res.json({ code: 0, data: { deleted: true } });
+});
+
+router.get("/level-thresholds", (req, res) => {
+  const thresholds = getLevelThresholds();
+  res.json({ code: 0, data: thresholds });
+});
+
+router.put("/level-thresholds", (req, res) => {
+  const { suspicious, violation } = req.body;
+  if (suspicious === undefined || violation === undefined) {
+    return res.json({
+      code: 400,
+      message: "缺少必要参数：suspicious, violation",
+    });
+  }
+  try {
+    const updated = setLevelThresholds({ suspicious, violation });
+    res.json({ code: 0, data: updated });
+  } catch (err) {
+    res.json({ code: 400, message: err.message });
+  }
 });
 
 module.exports = router;
