@@ -1,13 +1,8 @@
-const VALID_OPERATORS = {
-  lt: { label: "小于", fn: (value, threshold) => value < threshold },
-  lte: { label: "小于等于", fn: (value, threshold) => value <= threshold },
-  gt: { label: "大于", fn: (value, threshold) => value > threshold },
-  gte: { label: "大于等于", fn: (value, threshold) => value >= threshold },
-  eq: { label: "等于", fn: (value, threshold) => value === threshold },
-  neq: { label: "不等于", fn: (value, threshold) => value !== threshold },
-};
+const { getMatcherMap, getMatcherKeys } = require("../engine/matchers");
 
-const VALID_OPERATOR_KEYS = Object.keys(VALID_OPERATORS);
+const VALID_OPERATORS = getMatcherMap();
+
+const VALID_OPERATOR_KEYS = getMatcherKeys();
 
 const VALID_SEVERITIES = ["warning", "violation"];
 
@@ -51,13 +46,41 @@ const DEFAULT_LEVEL_THRESHOLDS = {
 };
 
 const DIMENSION_META = {
-  close_button_area_ratio: { type: "number", unit: "%", description: "关闭按钮面积占比" },
-  clickable_hot_area_ratio: { type: "number", unit: "%", description: "跳转热区占比" },
-  auto_jump_countdown_seconds: { type: "number", unit: "秒", description: "自动跳转倒计时" },
-  has_shake_jump: { type: "boolean", unit: "bool", description: "是否有摇一摇跳转" },
-  close_button_delay_ms: { type: "number", unit: "毫秒", description: "关闭按钮出现时延" },
-  is_fullscreen_clickable: { type: "boolean", unit: "bool", description: "是否全屏可点击跳转" },
-  fake_close_button_count: { type: "number", unit: "个", description: "虚假关闭按钮数量" },
+  close_button_area_ratio: {
+    type: "number",
+    unit: "%",
+    description: "关闭按钮面积占比",
+  },
+  clickable_hot_area_ratio: {
+    type: "number",
+    unit: "%",
+    description: "跳转热区占比",
+  },
+  auto_jump_countdown_seconds: {
+    type: "number",
+    unit: "秒",
+    description: "自动跳转倒计时",
+  },
+  has_shake_jump: {
+    type: "boolean",
+    unit: "bool",
+    description: "是否有摇一摇跳转",
+  },
+  close_button_delay_ms: {
+    type: "number",
+    unit: "毫秒",
+    description: "关闭按钮出现时延",
+  },
+  is_fullscreen_clickable: {
+    type: "boolean",
+    unit: "bool",
+    description: "是否全屏可点击跳转",
+  },
+  fake_close_button_count: {
+    type: "number",
+    unit: "个",
+    description: "虚假关闭按钮数量",
+  },
 };
 
 function normalizeBoolean(value) {
@@ -80,11 +103,16 @@ function getDimensionType(dimension) {
 function normalizeThreshold(dimension, threshold) {
   if (isBooleanDimension(dimension)) {
     const normalized = normalizeBoolean(threshold);
-    if (normalized === null) return { ok: false, error: `维度 ${dimension} 是布尔型，阈值需为 0/1、true/false、是/否 等可识别值` };
+    if (normalized === null)
+      return {
+        ok: false,
+        error: `维度 ${dimension} 是布尔型，阈值需为 0/1、true/false、是/否 等可识别值`,
+      };
     return { ok: true, value: normalized };
   }
   const num = Number(threshold);
-  if (isNaN(num)) return { ok: false, error: `维度 ${dimension} 是数值型，阈值需为有效数字` };
+  if (isNaN(num))
+    return { ok: false, error: `维度 ${dimension} 是数值型，阈值需为有效数字` };
   return { ok: true, value: num };
 }
 
@@ -96,19 +124,31 @@ function normalizeMetricValue(dimension, value) {
   return value;
 }
 
-function validateRuleInput({ dimension, operator, threshold, severity, weight }) {
+function validateRuleInput({
+  dimension,
+  operator,
+  threshold,
+  severity,
+  weight,
+}) {
   const errors = [];
+  const currentValidOperatorKeys = getMatcherKeys();
+  const currentValidOperators = getMatcherMap();
 
   if (!dimension || typeof dimension !== "string") {
     errors.push("dimension 不能为空");
   } else if (!DIMENSION_META[dimension]) {
-    errors.push(`未知的检测维度: ${dimension}，可用维度: ${Object.keys(DIMENSION_META).join(", ")}`);
+    errors.push(
+      `未知的检测维度: ${dimension}，可用维度: ${Object.keys(DIMENSION_META).join(", ")}`,
+    );
   }
 
   if (!operator) {
     errors.push("operator 不能为空");
-  } else if (!VALID_OPERATORS[operator]) {
-    errors.push(`不支持的比对方式: ${operator}，可用操作符: ${VALID_OPERATOR_KEYS.join(", ")} (${VALID_OPERATOR_KEYS.map((k) => VALID_OPERATORS[k].label).join(", ")})`);
+  } else if (!currentValidOperators[operator]) {
+    errors.push(
+      `不支持的比对方式: ${operator}，可用操作符: ${currentValidOperatorKeys.join(", ")} (${currentValidOperatorKeys.map((k) => currentValidOperators[k].label).join(", ")})`,
+    );
   }
 
   if (dimension && DIMENSION_META[dimension] && isBooleanDimension(dimension)) {
@@ -130,7 +170,10 @@ function validateRuleInput({ dimension, operator, threshold, severity, weight })
     errors.push(`severity 只能是: ${VALID_SEVERITIES.join(", ")}`);
   }
 
-  if (weight !== undefined && (typeof weight !== "number" || weight <= 0 || !Number.isInteger(weight))) {
+  if (
+    weight !== undefined &&
+    (typeof weight !== "number" || weight <= 0 || !Number.isInteger(weight))
+  ) {
     errors.push("weight 必须是正整数");
   }
 

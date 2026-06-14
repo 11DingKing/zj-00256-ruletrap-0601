@@ -1,11 +1,11 @@
 const {
-  VALID_OPERATORS,
   DIMENSION_META,
   normalizeMetricValue,
   normalizeThreshold,
-  isBooleanDimension,
 } = require("../config/ruleConfig");
 const { getLevelThresholds } = require("../db/database");
+const { getMatcher, getMatcherKeys } = require("./matchers");
+const { classifyLevel } = require("./LevelClassifier");
 
 function evaluateRule(rule, metrics) {
   const dimensionMeta = DIMENSION_META[rule.dimension];
@@ -18,12 +18,12 @@ function evaluateRule(rule, metrics) {
 
   const value = normalizeMetricValue(rule.dimension, rawValue);
 
-  const opEntry = VALID_OPERATORS[rule.operator];
-  if (!opEntry) {
+  const matcher = getMatcher(rule.operator);
+  if (!matcher) {
     return {
       hit: false,
       reason: "invalid_operator",
-      error: `操作符 ${rule.operator} 未在引擎中注册，请使用 lt/lte/gt/gte/eq/neq`,
+      error: `操作符 ${rule.operator} 未在引擎中注册，请使用 ${getMatcherKeys().join("/")}`,
     };
   }
 
@@ -36,7 +36,7 @@ function evaluateRule(rule, metrics) {
     threshold = norm.value;
   }
 
-  const hit = opEntry.fn(value, threshold);
+  const hit = matcher.match(value, threshold);
   return {
     hit,
     value,
@@ -48,9 +48,10 @@ function evaluateRule(rule, metrics) {
 }
 
 function runEngine(metrics, rules, options) {
-  const thresholds = options && options.levelThresholds
-    ? options.levelThresholds
-    : getLevelThresholds();
+  const thresholds =
+    options && options.levelThresholds
+      ? options.levelThresholds
+      : getLevelThresholds();
 
   const enabledRules = rules.filter((r) => r.is_enabled === 1);
   const hitRules = [];
@@ -82,12 +83,7 @@ function runEngine(metrics, rules, options) {
     }
   }
 
-  let level = "compliant";
-  if (totalScore >= thresholds.violation) {
-    level = "violation";
-  } else if (totalScore >= thresholds.suspicious) {
-    level = "suspicious";
-  }
+  const level = classifyLevel(totalScore, thresholds);
 
   return {
     totalScore,
